@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import apiClient from '../configs/apiClient';
+import { getTopicThemeVars } from '../utils/theme';
 import '../styles/Topics.scss';
 
 export default function TopicView() {
@@ -11,6 +12,10 @@ export default function TopicView() {
    const [loading, setLoading] = useState(true);
    const [error, setError] = useState('');
    const [expandedChapters, setExpandedChapters] = useState({});
+
+   const themeVars = useMemo(() => {
+      return getTopicThemeVars(topic?.primaryColor || '#D60808');
+   }, [topic?.primaryColor]);
 
    useEffect(() => {
       if (slug) {
@@ -43,7 +48,7 @@ export default function TopicView() {
    };
 
    return (
-      <div className="scisolve-catalog-page">
+      <div className="scisolve-catalog-page" style={themeVars}>
          <section className="catalog-hero-section">
             <div className="catalog-hero-container">
                <div>

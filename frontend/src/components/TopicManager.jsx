@@ -66,7 +66,7 @@ export default function TopicManager() {
 
    const [formData, setFormData] = useState({
       title: '', slug: '', discipline: 'physics', description: '',
-      thumbnail: '', order: 1, isActive: true,
+      thumbnail: '', primaryColor: '#D60808', order: 1, isActive: true,
    });
 
    const [toast, setToast] = useState(null);
@@ -167,6 +167,7 @@ export default function TopicManager() {
          discipline: 'physics',
          description: '',
          thumbnail: '',
+         primaryColor: '#D60808',
          order: topics.length + 1,
          isActive: true,
       });
@@ -181,6 +182,7 @@ export default function TopicManager() {
          discipline: topic.discipline || 'physics',
          description: topic.description || '',
          thumbnail: topic.thumbnail || '',
+         primaryColor: topic.primaryColor || '#D60808',
          order: topic.order || 1,
          isActive: topic.isActive !== false,
       });
@@ -386,7 +388,21 @@ export default function TopicManager() {
 
                                     <td>
                                        <div className="tm-title-cell">
-                                          <span className="topic-name">{topic.title}</span>
+                                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                                             <span
+                                                style={{
+                                                   display: 'inline-block',
+                                                   width: '0.75rem',
+                                                   height: '0.75rem',
+                                                   borderRadius: '50%',
+                                                   backgroundColor: topic.primaryColor || '#D60808',
+                                                   flexShrink: 0,
+                                                   boxShadow: '0 0 0 2px rgba(0,0,0,0.08)'
+                                                }}
+                                                title={`Màu chủ đạo: ${topic.primaryColor || '#D60808'}`}
+                                             />
+                                             <span className="topic-name">{topic.title}</span>
+                                          </div>
                                           <span className="topic-slug">/topics/{topic.slug}</span>
                                           {topic.description && <span className="topic-desc">{topic.description}</span>}
                                        </div>
@@ -525,6 +541,58 @@ export default function TopicManager() {
                               <input type="number" min={1} value={formData.order} onChange={(e) => setFormData({ ...formData, order: e.target.value })} />
                            </div>
                         </div>
+                        <div className="form-group">
+                           <label>Màu chủ đạo (Theme Color)</label>
+                           <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+                              <input
+                                 type="color"
+                                 value={formData.primaryColor || '#D60808'}
+                                 onChange={(e) => setFormData({ ...formData, primaryColor: e.target.value })}
+                                 style={{ width: '3.2rem', height: '2.5rem', padding: '0.15rem', cursor: 'pointer', borderRadius: '0.375rem', border: '1px solid rgba(0,0,0,0.15)' }}
+                              />
+                              <input
+                                 type="text"
+                                 placeholder="#D60808"
+                                 value={formData.primaryColor || '#D60808'}
+                                 onChange={(e) => setFormData({ ...formData, primaryColor: e.target.value })}
+                                 style={{ flex: 1, fontFamily: 'monospace', fontWeight: 600 }}
+                              />
+                           </div>
+                           <div style={{ display: 'flex', gap: '0.4rem', marginTop: '0.4rem', flexWrap: 'wrap' }}>
+                              {[
+                                 { color: '#D60808', name: 'Đỏ' },
+                                 { color: '#2563EB', name: 'Xanh lam' },
+                                 { color: '#059669', name: 'Xanh lục' },
+                                 { color: '#7C3AED', name: 'Tím' },
+                                 { color: '#D97706', name: 'Cam' },
+                                 { color: '#0284C7', name: 'Xanh biển' },
+                                 { color: '#DB2777', name: 'Hồng' },
+                                 { color: '#1F2937', name: 'Đen xám' },
+                              ].map((p) => (
+                                 <button
+                                    key={p.color}
+                                    type="button"
+                                    onClick={() => setFormData({ ...formData, primaryColor: p.color })}
+                                    style={{
+                                       display: 'inline-flex',
+                                       alignItems: 'center',
+                                       gap: '0.3rem',
+                                       padding: '0.2rem 0.45rem',
+                                       fontSize: '0.72rem',
+                                       fontWeight: 600,
+                                       border: formData.primaryColor === p.color ? `2px solid ${p.color}` : '1px solid rgba(0,0,0,0.12)',
+                                       borderRadius: '0.25rem',
+                                       backgroundColor: formData.primaryColor === p.color ? `${p.color}15` : '#ffffff',
+                                       cursor: 'pointer',
+                                    }}
+                                 >
+                                    <span style={{ width: '0.65rem', height: '0.65rem', borderRadius: '50%', backgroundColor: p.color }} />
+                                    <span>{p.name}</span>
+                                 </button>
+                              ))}
+                           </div>
+                        </div>
+
                         <div className="form-group">
                            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', textTransform: 'none', fontWeight: 600, fontSize: '0.875rem' }}>
                               <input type="checkbox" style={{ width: 'auto' }} checked={formData.isActive} onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })} />

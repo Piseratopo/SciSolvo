@@ -581,11 +581,15 @@ button {
     border-left: 4px solid var(--primary-color);
     padding-left: 1rem;
     margin: 1rem 0;
-    color: rgba(0, 0, 0, 0.7);
-    background-color: rgba(214, 8, 8, 0.04);
+    color: var(--color-text);
+    background-color: var(--primary-color-blockquote-bg, rgba(214, 8, 8, 0.04));
     padding-top: 0.5rem;
     padding-bottom: 0.5rem;
     border-radius: 0 0.25rem 0.25rem 0;
+
+    p, ul, ol, li, span {
+      color: inherit;
+    }
   }
 
   code {

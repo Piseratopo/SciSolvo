@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import apiClient from '../configs/apiClient';
 import LatexMarkdown from './common/LatexMarkdown';
+import { getTopicThemeVars } from '../utils/theme';
 import '../styles/LessonView.scss';
 
 export default function LessonView() {
@@ -10,6 +11,7 @@ export default function LessonView() {
 
    const [lesson, setLesson] = useState(null);
    const [topicChapters, setTopicChapters] = useState([]);
+   const [topicColor, setTopicColor] = useState('#D60808');
    const [loading, setLoading] = useState(true);
    const [error, setError] = useState('');
 
@@ -35,11 +37,16 @@ export default function LessonView() {
             const res = await apiClient.get(`/lessons/${lessonId}`);
             if (isMounted) {
                setLesson(res.data);
+               if (res.data.topicPrimaryColor) {
+                  setTopicColor(res.data.topicPrimaryColor);
+               }
                setActiveSectionIdx(0);
             }
          } catch (err) {
             if (isMounted) {
-               setError(err.response?.data?.error || 'Không thể tải nội dung bài học.');
+               setError(
+                  err.response?.data?.error || 'Không thể tải nội dung bài học.'
+               );
             }
          } finally {
             if (isMounted) setLoading(false);
@@ -47,7 +54,9 @@ export default function LessonView() {
       };
 
       loadLesson();
-      return () => { isMounted = false; };
+      return () => {
+         isMounted = false;
+      };
    }, [lessonId]);
 
    useEffect(() => {
@@ -60,34 +69,71 @@ export default function LessonView() {
       const loadTopicChapters = async () => {
          try {
             const res = await apiClient.get(`/topics/${lesson.topicSlug}`);
-            if (isMounted) setTopicChapters(res.data.chapters || []);
+            if (isMounted) {
+               setTopicChapters(res.data.chapters || []);
+               if (res.data.primaryColor) {
+                  setTopicColor(res.data.primaryColor);
+               }
+            }
          } catch {
             if (isMounted) setTopicChapters([]);
          }
       };
 
       loadTopicChapters();
-      return () => { isMounted = false; };
+      return () => {
+         isMounted = false;
+      };
    }, [lesson?.topicSlug]);
 
    const sections = useMemo(() => lesson?.sections || [], [lesson]);
    const currentSection = sections[activeSectionIdx] || null;
    const currentAnswer = userAnswers[activeSectionIdx];
-   const hasAnswer = Array.isArray(currentAnswer)
-      ? currentAnswer.length > 0
-      : typeof currentAnswer === 'string'
-         ? currentAnswer.trim().length > 0
-         : currentAnswer !== undefined && currentAnswer !== null;
-   const chaptersForNavigation = topicChapters.length > 0
-      ? topicChapters
-      : lesson?.chapterLessons?.length
-         ? [{
-            _id: lesson.chapterId,
-            order: lesson.chapterOrder,
-            name: lesson.chapterTitle,
-            lessons: lesson.chapterLessons,
-         }]
-         : [];
+   const hasAnswer = useMemo(() => {
+      if (!currentSection || currentSection.type !== 'exercise') return true;
+      if (currentSection.exercise?.type === 'fill_blank') {
+         const blanks = currentSection.exercise?.payload?.blanks;
+         if (Array.isArray(blanks) && blanks.length > 0) {
+            const ansObj =
+               typeof currentAnswer === 'object' &&
+               !Array.isArray(currentAnswer) &&
+               currentAnswer !== null
+                  ? currentAnswer
+                  : {};
+            return blanks.every((b) => {
+               const val = ansObj[b.id];
+               return (
+                  val !== undefined &&
+                  val !== null &&
+                  String(val).trim().length > 0
+               );
+            });
+         }
+         return typeof currentAnswer === 'string'
+            ? currentAnswer.trim().length > 0
+            : currentAnswer !== undefined &&
+                 currentAnswer !== null &&
+                 String(currentAnswer).trim().length > 0;
+      }
+      return Array.isArray(currentAnswer)
+         ? currentAnswer.length > 0
+         : typeof currentAnswer === 'string'
+           ? currentAnswer.trim().length > 0
+           : currentAnswer !== undefined && currentAnswer !== null;
+   }, [currentSection, currentAnswer]);
+   const chaptersForNavigation =
+      topicChapters.length > 0
+         ? topicChapters
+         : lesson?.chapterLessons?.length
+           ? [
+                {
+                   _id: lesson.chapterId,
+                   order: lesson.chapterOrder,
+                   name: lesson.chapterTitle,
+                   lessons: lesson.chapterLessons,
+                },
+             ]
+           : [];
 
    // Handle answering MCQ single
    const handleSelectOption = (optId) => {
@@ -113,16 +159,32 @@ export default function LessonView() {
    };
 
    // Handle fill blank
-   const handleFillBlankChange = (val) => {
-      setUserAnswers((prev) => ({
-         ...prev,
-         [activeSectionIdx]: val,
-      }));
+   const handleFillBlankChange = (blankId, val) => {
+      setUserAnswers((prev) => {
+         const current = prev[activeSectionIdx];
+         const curObj =
+            typeof current === 'object' &&
+            !Array.isArray(current) &&
+            current !== null
+               ? { ...current }
+               : typeof current === 'string'
+                 ? { [blankId]: current }
+                 : {};
+
+         return {
+            ...prev,
+            [activeSectionIdx]: {
+               ...curObj,
+               [blankId]: val,
+            },
+         };
+      });
    };
 
    // Submit answer to backend
    const handleSubmitExercise = async () => {
-      if (!lesson || !currentSection || currentSection.type !== 'exercise') return;
+      if (!lesson || !currentSection || currentSection.type !== 'exercise')
+         return;
 
       if (!hasAnswer) return;
 
@@ -158,7 +220,10 @@ export default function LessonView() {
             }));
          }
       } catch (err) {
-         alert(err.response?.data?.error || 'Không thể gửi câu trả lời. Vui lòng kiểm tra lại đăng nhập.');
+         alert(
+            err.response?.data?.error ||
+               'Không thể gửi câu trả lời. Vui lòng kiểm tra lại đăng nhập.'
+         );
       } finally {
          setSubmitting(false);
       }
@@ -178,7 +243,9 @@ export default function LessonView() {
          setActiveSectionIdx((prev) => prev + 1);
          window.scrollTo({ top: 0, behavior: 'smooth' });
       } else {
-         const backUrl = lesson?.topicSlug ? `/topics/${lesson.topicSlug}` : '/topics';
+         const backUrl = lesson?.topicSlug
+            ? `/topics/${lesson.topicSlug}`
+            : '/topics';
          navigate(backUrl);
       }
    };
@@ -201,29 +268,62 @@ export default function LessonView() {
       }, 1400);
    };
 
-   useEffect(() => () => {
-      if (giveUpTimerRef.current !== null) clearTimeout(giveUpTimerRef.current);
-   }, []);
+   useEffect(
+      () => () => {
+         if (giveUpTimerRef.current !== null)
+            clearTimeout(giveUpTimerRef.current);
+      },
+      []
+   );
+
+   const themeVars = useMemo(() => getTopicThemeVars(topicColor), [topicColor]);
 
    if (loading) {
       return (
-         <div className="lesson-view-page" style={{ alignItems: 'center', justifyContent: 'center' }}>
-            <span className="material-symbols-outlined spin-icon" style={{ fontSize: '3rem', color: 'var(--primary-color)' }}>
+         <div
+            className="lesson-view-page"
+            style={{
+               ...themeVars,
+               alignItems: 'center',
+               justifyContent: 'center',
+            }}
+         >
+            <span
+               className="material-symbols-outlined spin-icon"
+               style={{ fontSize: '3rem', color: 'var(--primary-color)' }}
+            >
                progress_activity
             </span>
-            <p style={{ marginTop: '1rem', fontWeight: 700, color: '#5e3f3a' }}>Đang tải...</p>
+            <p style={{ marginTop: '1rem', fontWeight: 700, color: '#5e3f3a' }}>
+               Đang tải...
+            </p>
          </div>
       );
    }
 
    if (error || !lesson) {
       return (
-         <div className="lesson-view-page" style={{ alignItems: 'center', justifyContent: 'center', padding: '2rem' }}>
-            <span className="material-symbols-outlined" style={{ fontSize: '3.5rem', color: 'var(--primary-color)' }}>
+         <div
+            className="lesson-view-page"
+            style={{
+               ...themeVars,
+               alignItems: 'center',
+               justifyContent: 'center',
+               padding: '2rem',
+            }}
+         >
+            <span
+               className="material-symbols-outlined"
+               style={{ fontSize: '3.5rem', color: 'var(--primary-color)' }}
+            >
                error_outline
             </span>
-            <h2 style={{ margin: '1rem 0 0.5rem 0', fontWeight: 800 }}>{error || 'Không tìm thấy bài học'}</h2>
-            <p style={{ color: 'rgba(0,0,0,0.6)', marginBottom: '1.5rem' }}>Bài học này không tồn tại hoặc bạn chưa có quyền truy cập.</p>
+            <h2 style={{ margin: '1rem 0 0.5rem 0', fontWeight: 800 }}>
+               {error || 'Không tìm thấy bài học'}
+            </h2>
+            <p style={{ color: 'rgba(0,0,0,0.6)', marginBottom: '1.5rem' }}>
+               Bài học này không tồn tại hoặc bạn chưa có quyền truy cập.
+            </p>
             <button className="btn-common" onClick={() => navigate('/topics')}>
                Quay lại danh mục môn học
             </button>
@@ -231,36 +331,58 @@ export default function LessonView() {
       );
    }
 
-   const topicBackUrl = lesson.topicSlug ? `/topics/${lesson.topicSlug}` : '/topics';
+   const topicBackUrl = lesson.topicSlug
+      ? `/topics/${lesson.topicSlug}`
+      : '/topics';
    const currentResult = exerciseResults[activeSectionIdx];
-   const isCheckingAnswer = currentSection?.type === 'exercise' && !currentResult?.isCorrect;
+   const isCheckingAnswer =
+      currentSection?.type === 'exercise' && !currentResult?.isCorrect;
    const isLastSection = activeSectionIdx === sections.length - 1;
 
    return (
-      <div className="lesson-view-page">
+      <div className="lesson-view-page" style={themeVars}>
          {/* ================= MAIN WORKSPACE AREA (NO TOP HEADER) ================= */}
          <div className="lv-workspace-container">
             {/* BEGIN: LeftSidebar (Outline, 260px) */}
             <aside className="lv-sidebar">
                <div>
-                  <Link to={topicBackUrl} className="sidebar-back-btn" title="Quay lại khóa học">
-                     <span className="material-symbols-outlined">arrow_back</span>
+                  <Link
+                     to={topicBackUrl}
+                     className="sidebar-back-btn"
+                     title="Quay lại khóa học"
+                  >
+                     <span className="material-symbols-outlined">
+                        arrow_back
+                     </span>
                      <span>Quay lại Khóa học</span>
                   </Link>
 
                   {/* Topic Box */}
                   <div className="sidebar-topic-card">
-                     <h2 className="topic-heading">{lesson.topicTitle || 'Chuyên đề'}</h2>
-                     <p className="topic-sub">{lesson.chapterTitle ? `Chương ${lesson.chapterOrder}: ${lesson.chapterTitle}` : 'Nội dung bài học'}</p>
+                     <h2 className="topic-heading">
+                        {lesson.topicTitle || 'Chuyên đề'}
+                     </h2>
+                     <p className="topic-sub">
+                        {lesson.chapterTitle
+                           ? `Chương ${lesson.chapterOrder}: ${lesson.chapterTitle}`
+                           : 'Nội dung bài học'}
+                     </p>
                   </div>
 
                   <div className="sidebar-section-title">Chương và bài học</div>
-                  <nav className="sidebar-curriculum-list" aria-label="Danh sách chương và bài học">
+                  <nav
+                     className="sidebar-curriculum-list"
+                     aria-label="Danh sách chương và bài học"
+                  >
                      {chaptersForNavigation.map((chapter) => (
                         <section className="sidebar-chapter" key={chapter._id}>
                            <h3 className="sidebar-chapter-heading">
-                              <span className="chapter-order">Chương {chapter.order || 1}</span>
-                              <span className="chapter-name">{chapter.name}</span>
+                              <span className="chapter-order">
+                                 Chương {chapter.order || 1}
+                              </span>
+                              <span className="chapter-name">
+                                 {chapter.name}
+                              </span>
                            </h3>
                            <div className="sidebar-list">
                               {(chapter.lessons || []).map((item, index) => {
@@ -274,11 +396,20 @@ export default function LessonView() {
                                        key={item._id}
                                        to={lessonUrl}
                                        className={`sidebar-item ${isCurrent ? 'active' : ''}`}
-                                       aria-current={isCurrent ? 'page' : undefined}
+                                       aria-current={
+                                          isCurrent ? 'page' : undefined
+                                       }
                                     >
                                        <div className="item-left">
-                                          <span className="material-symbols-outlined" aria-hidden="true">menu_book</span>
-                                          <span className="item-text">{index + 1}. {item.title}</span>
+                                          <span
+                                             className="material-symbols-outlined"
+                                             aria-hidden="true"
+                                          >
+                                             menu_book
+                                          </span>
+                                          <span className="item-text">
+                                             {index + 1}. {item.title}
+                                          </span>
                                        </div>
                                     </Link>
                                  );
@@ -288,7 +419,6 @@ export default function LessonView() {
                      ))}
                   </nav>
                </div>
-
             </aside>
 
             <main className="lv-main-content">
@@ -297,7 +427,12 @@ export default function LessonView() {
                   {currentSection?.type === 'doc' && (
                      <div className="content-card-box">
                         <div className="content-body-serif">
-                           <LatexMarkdown content={currentSection.docContent?.body || 'Chưa có nội dung văn bản lí thuyết.'} />
+                           <LatexMarkdown
+                              content={
+                                 currentSection.docContent?.body ||
+                                 'Chưa có nội dung văn bản lí thuyết.'
+                              }
+                           />
                         </div>
                      </div>
                   )}
@@ -306,30 +441,44 @@ export default function LessonView() {
                   {currentSection?.type === 'exercise' && (
                      <div className="content-card-box">
                         <div className="content-body-serif">
-                           <LatexMarkdown content={currentSection.exercise?.question || 'Nội dung câu hỏi đang được biên soạn...'} />
+                           <LatexMarkdown
+                              content={
+                                 currentSection.exercise?.question ||
+                                 'Nội dung câu hỏi đang được biên soạn...'
+                              }
+                           />
                         </div>
-                        {currentResult?.isCorrect && currentResult.explanation && (
-                           <div className="explanation-accordion">
-                              <button
-                                 type="button"
-                                 className="btn-toggle-exp"
-                                 onClick={() => toggleExplanation(activeSectionIdx)}
-                              >
-                                 <span className="exp-title-group">
-                                    <span className="material-symbols-outlined">menu_book</span>
-                                    <span>Lời giải chi tiết</span>
-                                 </span>
-                                 <span className={`material-symbols-outlined arrow-icon ${expandedExplanations[activeSectionIdx] ? 'open' : ''}`}>
-                                    expand_more
-                                 </span>
-                              </button>
-                              {expandedExplanations[activeSectionIdx] && (
-                                 <div className="exp-body">
-                                    <LatexMarkdown content={currentResult.explanation} />
-                                 </div>
-                              )}
-                           </div>
-                        )}
+                        {currentResult?.isCorrect &&
+                           currentResult.explanation && (
+                              <div className="explanation-accordion">
+                                 <button
+                                    type="button"
+                                    className="btn-toggle-exp"
+                                    onClick={() =>
+                                       toggleExplanation(activeSectionIdx)
+                                    }
+                                 >
+                                    <span className="exp-title-group">
+                                       <span className="material-symbols-outlined">
+                                          menu_book
+                                       </span>
+                                       <span>Lời giải chi tiết</span>
+                                    </span>
+                                    <span
+                                       className={`material-symbols-outlined arrow-icon ${expandedExplanations[activeSectionIdx] ? 'open' : ''}`}
+                                    >
+                                       expand_more
+                                    </span>
+                                 </button>
+                                 {expandedExplanations[activeSectionIdx] && (
+                                    <div className="exp-body">
+                                       <LatexMarkdown
+                                          content={currentResult.explanation}
+                                       />
+                                    </div>
+                                 )}
+                              </div>
+                           )}
                      </div>
                   )}
                </div>
@@ -338,7 +487,10 @@ export default function LessonView() {
                   <div className="lv-right-progress-strip">
                      <div className="lv-progress-segments">
                         {sections.map((sec, idx) => {
-                           const isDone = Boolean(exerciseResults[idx]?.isCorrect || (sec.type === 'doc' && idx < activeSectionIdx));
+                           const isDone = Boolean(
+                              exerciseResults[idx]?.isCorrect ||
+                              (sec.type === 'doc' && idx < activeSectionIdx)
+                           );
                            const isActive = idx === activeSectionIdx;
 
                            return (
@@ -350,7 +502,9 @@ export default function LessonView() {
                                  onClick={() => setActiveSectionIdx(idx)}
                                  title={`Phần ${idx + 1}: ${sec.title}`}
                               >
-                                 <div className={`segment-bar ${isDone ? 'done' : ''} ${isActive ? 'active' : ''}`} />
+                                 <div
+                                    className={`segment-bar ${isDone ? 'done' : ''} ${isActive ? 'active' : ''}`}
+                                 />
                               </button>
                            );
                         })}
@@ -362,9 +516,13 @@ export default function LessonView() {
                            aria-label="Phần trước"
                            title="Phần trước"
                            disabled={activeSectionIdx === 0}
-                           onClick={() => setActiveSectionIdx((idx) => Math.max(0, idx - 1))}
+                           onClick={() =>
+                              setActiveSectionIdx((idx) => Math.max(0, idx - 1))
+                           }
                         >
-                           <span className="material-symbols-outlined">chevron_left</span>
+                           <span className="material-symbols-outlined">
+                              chevron_left
+                           </span>
                         </button>
                         <button
                            type="button"
@@ -372,9 +530,15 @@ export default function LessonView() {
                            aria-label="Phần tiếp theo"
                            title="Phần tiếp theo"
                            disabled={activeSectionIdx >= sections.length - 1}
-                           onClick={() => setActiveSectionIdx((idx) => Math.min(sections.length - 1, idx + 1))}
+                           onClick={() =>
+                              setActiveSectionIdx((idx) =>
+                                 Math.min(sections.length - 1, idx + 1)
+                              )
+                           }
                         >
-                           <span className="material-symbols-outlined">chevron_right</span>
+                           <span className="material-symbols-outlined">
+                              chevron_right
+                           </span>
                         </button>
                      </div>
                   </div>
@@ -383,20 +547,27 @@ export default function LessonView() {
                      <div className="interactive-section">
                         {currentSection.exercise?.type === 'mcq_single' && (
                            <div className="quiz-options-list">
-                              {(currentSection.exercise?.payload?.options || []).map((opt) => {
-                                 const isSelected = userAnswers[activeSectionIdx] === opt.id;
+                              {(
+                                 currentSection.exercise?.payload?.options || []
+                              ).map((opt) => {
+                                 const isSelected =
+                                    userAnswers[activeSectionIdx] === opt.id;
                                  return (
                                     <label
                                        key={opt.id}
                                        className={`option-card-label ${isSelected ? 'selected' : ''}`}
-                                       onClick={() => handleSelectOption(opt.id)}
+                                       onClick={() =>
+                                          handleSelectOption(opt.id)
+                                       }
                                     >
                                        <div className="card-inner">
                                           <span className="check-circle">
                                              {isSelected ? '✓' : ''}
                                           </span>
                                           <div className="option-text">
-                                             <LatexMarkdown content={opt.label || ''} />
+                                             <LatexMarkdown
+                                                content={opt.label || ''}
+                                             />
                                           </div>
                                        </div>
                                     </label>
@@ -407,21 +578,33 @@ export default function LessonView() {
 
                         {currentSection.exercise?.type === 'mcq_multiple' && (
                            <div className="quiz-options-list">
-                              {(currentSection.exercise?.payload?.options || []).map((opt) => {
-                                 const selectedList = userAnswers[activeSectionIdx] || [];
-                                 const isSelected = selectedList.includes(opt.id);
+                              {(
+                                 currentSection.exercise?.payload?.options || []
+                              ).map((opt) => {
+                                 const selectedList =
+                                    userAnswers[activeSectionIdx] || [];
+                                 const isSelected = selectedList.includes(
+                                    opt.id
+                                 );
                                  return (
                                     <label
                                        key={opt.id}
                                        className={`option-card-label ${isSelected ? 'selected' : ''}`}
-                                       onClick={() => handleToggleMultipleOption(opt.id)}
+                                       onClick={() =>
+                                          handleToggleMultipleOption(opt.id)
+                                       }
                                     >
                                        <div className="card-inner">
-                                          <span className="check-circle" style={{ borderRadius: '0.25rem' }}>
+                                          <span
+                                             className="check-circle"
+                                             style={{ borderRadius: '0.25rem' }}
+                                          >
                                              {isSelected ? '✓' : ''}
                                           </span>
                                           <div className="option-text">
-                                             <LatexMarkdown content={opt.label || ''} />
+                                             <LatexMarkdown
+                                                content={opt.label || ''}
+                                             />
                                           </div>
                                        </div>
                                     </label>
@@ -430,36 +613,104 @@ export default function LessonView() {
                            </div>
                         )}
 
-                        {currentSection.exercise?.type === 'fill_blank' && (
-                           <div className="fill-blank-container">
-                              <input
-                                 type="text"
-                                 placeholder={currentSection.exercise?.payload?.placeholder || 'Nhập kết quả số hoặc đáp án...'}
-                                 value={userAnswers[activeSectionIdx] || ''}
-                                 onChange={(e) => handleFillBlankChange(e.target.value)}
-                              />
-                              {currentSection.exercise?.payload?.unit && (
-                                 <span className="unit-badge">{currentSection.exercise.payload.unit}</span>
-                              )}
-                           </div>
-                        )}
+                        {currentSection.exercise?.type === 'fill_blank' &&
+                           (() => {
+                              const blanks = currentSection.exercise?.payload
+                                 ?.blanks?.length
+                                 ? currentSection.exercise.payload.blanks
+                                 : [
+                                      {
+                                         id: 'blank_1',
+                                         label:
+                                            currentSection.exercise?.payload
+                                               ?.label || 'Đáp số',
+                                         placeholder:
+                                            currentSection.exercise?.payload
+                                               ?.placeholder ||
+                                            'Nhập kết quả số hoặc đáp án...',
+                                         unit:
+                                            currentSection.exercise?.payload
+                                               ?.unit || '',
+                                      },
+                                   ];
 
+                              const answersForSection =
+                                 typeof currentAnswer === 'object' &&
+                                 !Array.isArray(currentAnswer) &&
+                                 currentAnswer !== null
+                                    ? currentAnswer
+                                    : typeof currentAnswer === 'string'
+                                      ? {
+                                           [blanks[0]?.id || 'blank_1']:
+                                              currentAnswer,
+                                        }
+                                      : {};
+
+                              return (
+                                 <div className="fill-blanks-group">
+                                    {blanks.map((blank, idx) => {
+                                       const bId =
+                                          blank.id || `blank_${idx + 1}`;
+                                       const val = answersForSection[bId] ?? '';
+                                       return (
+                                          <div
+                                             key={bId}
+                                             className="fill-blank-card-item"
+                                          >
+                                             <div className="fb-label-row">
+                                                <span className="fb-number-tag">
+                                                   {idx + 1}
+                                                </span>
+                                                <div className="fb-label-content">
+                                                   <LatexMarkdown
+                                                      content={
+                                                         blank.label ||
+                                                         `Đáp số ${idx + 1}`
+                                                      }
+                                                   />
+                                                </div>
+                                             </div>
+                                             <div className="fb-input-wrapper">
+                                                <input
+                                                   type="text"
+                                                   placeholder={
+                                                      blank.placeholder ||
+                                                      'Nhập kết quả số hoặc đáp án...'
+                                                   }
+                                                   value={val}
+                                                   onChange={(e) =>
+                                                      handleFillBlankChange(
+                                                         bId,
+                                                         e.target.value
+                                                      )
+                                                   }
+                                                   disabled={Boolean(
+                                                      currentResult?.isCorrect
+                                                   )}
+                                                />
+                                                {blank.unit && (
+                                                   <span className="unit-badge">
+                                                      {blank.unit}
+                                                   </span>
+                                                )}
+                                             </div>
+                                          </div>
+                                       );
+                                    })}
+                                 </div>
+                              );
+                           })()}
                      </div>
                   ) : (
                      /* When section is Theory (doc) */
                      <div className="interactive-section">
                         <div className="question-title-wrap">
-                           <h3 className="question-title">Nội dung lí thuyết</h3>
-                           <p className="question-subtitle">Đọc kĩ phần trình bày lí thuyết bên cạnh để chuẩn bị cho phần bài tập vận dụng tiếp theo.</p>
-                        </div>
-
-                        <div className="doc-takeaway-card">
-                           <div className="takeaway-header">
-                              <span className="material-symbols-outlined" style={{ fontSize: '1.2rem' }}>lightbulb</span>
-                              <span>Ghi nhớ trọng tâm</span>
-                           </div>
-                           <p>
-                              Nắm vững các định luật cơ bản và mối liên hệ giữa các đại lượng trước khi chuyển qua phần câu hỏi trắc nghiệm hoặc bài tập tính toán.
+                           <h3 className="question-title">
+                              Nội dung lí thuyết
+                           </h3>
+                           <p className="question-subtitle">
+                              Đọc kĩ phần trình bày lí thuyết bên cạnh để chuẩn
+                              bị cho phần bài tập vận dụng tiếp theo.
                            </p>
                         </div>
                      </div>
@@ -486,32 +737,52 @@ export default function LessonView() {
                               }
                            }}
                            onKeyUp={(event) => {
-                              if (event.key === ' ' || event.key === 'Enter') cancelGiveUpHold();
+                              if (event.key === ' ' || event.key === 'Enter')
+                                 cancelGiveUpHold();
                            }}
                            onBlur={cancelGiveUpHold}
                            onContextMenu={(event) => event.preventDefault()}
                         >
-                           <span className="material-symbols-outlined" aria-hidden="true">flag</span>
+                           <span
+                              className="material-symbols-outlined"
+                              aria-hidden="true"
+                           >
+                              flag
+                           </span>
                         </button>
                      )}
                      <button
                         type="button"
-                        className={isCheckingAnswer ? 'btn-check-answer' : 'btn-next-step'}
-                        onClick={isCheckingAnswer ? handleSubmitExercise : handleNextStep}
-                        disabled={isCheckingAnswer && (submitting || !hasAnswer)}
+                        className={
+                           isCheckingAnswer
+                              ? 'btn-check-answer'
+                              : 'btn-next-step'
+                        }
+                        onClick={
+                           isCheckingAnswer
+                              ? handleSubmitExercise
+                              : handleNextStep
+                        }
+                        disabled={
+                           isCheckingAnswer && (submitting || !hasAnswer)
+                        }
                      >
                         <span className="material-symbols-outlined">
                            {isCheckingAnswer
-                              ? currentResult && !currentResult.isCorrect ? 'replay' : 'verified'
-                              : currentResult?.isCorrect ? 'check_circle' : 'arrow_forward'}
+                              ? currentResult && !currentResult.isCorrect
+                                 ? 'replay'
+                                 : 'verified'
+                              : currentResult?.isCorrect
+                                ? 'check_circle'
+                                : 'arrow_forward'}
                         </span>
                         <span>
                            {isCheckingAnswer
                               ? submitting
                                  ? 'Đang chấm điểm...'
                                  : currentResult && !currentResult.isCorrect
-                                    ? 'Chưa chính xác · Thử lại'
-                                    : 'Kiểm tra đáp án'
+                                   ? 'Chưa chính xác · Thử lại'
+                                   : 'Kiểm tra đáp án'
                               : `${currentResult?.isCorrect ? 'Chính xác! ' : ''}${isLastSection ? 'Hoàn thành bài học' : 'Tiếp tục'}`}
                         </span>
                      </button>

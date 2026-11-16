@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import apiClient from '../configs/apiClient';
+import { getTopicThemeVars } from '../utils/theme';
 import '../styles/Topics.scss';
 
 const DISCIPLINE_META = {
@@ -109,6 +110,7 @@ export default function Topics() {
                               return (
                                  <article
                                     key={topic._id || topic.slug}
+                                    style={getTopicThemeVars(topic.primaryColor || '#D60808')}
                                     className={`topic-card-item ${isUpcoming ? 'topic-card-item--upcoming' : ''}`}
                                     onClick={() => navigate(`/topics/${topic.slug}`)}
                                  >
@@ -139,12 +141,6 @@ export default function Topics() {
                                     </div>
 
                                     <div className="topic-card-footer">
-                                       <span className="topic-card-meta">
-                                          <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>
-                                             collections_bookmark
-                                          </span>
-                                          {isUpcoming ? 'Đang biên soạn' : 'Khám phá bài học'}
-                                       </span>
                                        <span className="topic-card-action">
                                           <span>{isUpcoming ? 'Xem trước' : 'Khám phá'}</span>
                                           <span className="material-symbols-outlined action-arrow">

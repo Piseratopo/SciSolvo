@@ -307,7 +307,7 @@ app.get('/api/admin/topics', async (req, res, next) => {
 // Create a new topic
 app.post('/api/topics', async (req, res, next) => {
    try {
-      const { title, slug, description, discipline, thumbnail, order, isActive } = req.body || {};
+      const { title, slug, description, discipline, thumbnail, order, isActive, primaryColor } = req.body || {};
       if (!title || !slug) {
          return res.status(400).json({ error: 'Tiêu đề và Slug là bắt buộc' });
       }
@@ -322,6 +322,7 @@ app.post('/api/topics', async (req, res, next) => {
          description: description || '',
          discipline: discipline || 'physics',
          thumbnail: thumbnail || '',
+         primaryColor: primaryColor || '#D60808',
          order: Number(order) || count + 1,
          isActive: isActive !== false,
          createdAt: new Date(),
@@ -337,7 +338,7 @@ app.put('/api/topics/:id', async (req, res, next) => {
    try {
       const id = asObjectId(req.params.id);
       if (!id) return res.status(400).json({ error: 'ID không hợp lệ' });
-      const { title, slug, description, discipline, thumbnail, order, isActive } = req.body || {};
+      const { title, slug, description, discipline, thumbnail, order, isActive, primaryColor } = req.body || {};
       if (slug) {
          const conflict = await db.collection('topics').findOne({ slug, _id: { $ne: id } });
          if (conflict) {
@@ -350,6 +351,7 @@ app.put('/api/topics/:id', async (req, res, next) => {
       if (description !== undefined) updateData.description = description;
       if (discipline !== undefined) updateData.discipline = discipline;
       if (thumbnail !== undefined) updateData.thumbnail = thumbnail;
+      if (primaryColor !== undefined) updateData.primaryColor = primaryColor;
       if (order !== undefined) updateData.order = Number(order);
       if (isActive !== undefined) updateData.isActive = Boolean(isActive);
 
@@ -540,6 +542,7 @@ app.get('/api/admin/lessons/:id', async (req, res, next) => {
          chapterTitle: chapter?.name || '',
          topicTitle: topic?.title || '',
          topicSlug: topic?.slug || '',
+         topicPrimaryColor: topic?.primaryColor || '#D60808',
       });
    } catch (error) { next(error); }
 });
@@ -682,6 +685,7 @@ app.get('/api/lessons/:lessonId', async (req, res, next) => {
          chapterLessons: chapterLessons || [],
          topicTitle: topic?.title || '',
          topicSlug: topic?.slug || '',
+         topicPrimaryColor: topic?.primaryColor || '#D60808',
       });
    } catch (error) { next(error); }
 });
@@ -718,12 +722,32 @@ app.post('/api/lessons/:lessonId/exercises/:sectionIndex/submit', requireToken, 
          const given = Array.isArray(answer) ? [...answer].sort() : [];
          isCorrect = JSON.stringify(expected) === JSON.stringify(given);
       } else if (type === 'fill_blank') {
-         if (typeof solution?.correctValue === 'number') {
-            const numAns = Number(answer);
-            const tolerance = solution.tolerance || 0.01;
-            isCorrect = !isNaN(numAns) && Math.abs(numAns - solution.correctValue) <= tolerance;
+         if (Array.isArray(solution?.blanks) && solution.blanks.length > 0) {
+            isCorrect = solution.blanks.every((b) => {
+               const userVal = typeof answer === 'object' && answer !== null ? answer[b.id] : answer;
+               if (userVal === undefined || userVal === null || String(userVal).trim() === '') return false;
+
+               const expected = b.exactValue ?? b.correctValue;
+               const tolerance = b.tolerance !== undefined && b.tolerance !== '' ? Number(b.tolerance) : 0.01;
+
+               if (typeof expected === 'number' || (!isNaN(Number(expected)) && String(expected).trim() !== '')) {
+                  const numAns = Number(userVal);
+                  return !isNaN(numAns) && Math.abs(numAns - Number(expected)) <= tolerance;
+               }
+               return String(userVal).trim().toLowerCase() === String(expected).trim().toLowerCase();
+            });
          } else {
-            isCorrect = String(answer || '').trim().toLowerCase() === String(solution?.correctValue || '').trim().toLowerCase();
+            const expected = solution?.exactValue ?? solution?.correctValue;
+            const tolerance = solution?.tolerance !== undefined && solution?.tolerance !== '' ? Number(solution.tolerance) : 0.01;
+            const userVal = typeof answer === 'object' && answer !== null
+               ? (answer.exactValue ?? answer[Object.keys(answer)[0]])
+               : answer;
+            if (typeof expected === 'number' || (!isNaN(Number(expected)) && String(expected).trim() !== '')) {
+               const numAns = Number(userVal);
+               isCorrect = !isNaN(numAns) && Math.abs(numAns - Number(expected)) <= tolerance;
+            } else {
+               isCorrect = String(userVal || '').trim().toLowerCase() === String(expected || '').trim().toLowerCase();
+            }
          }
       } else {
          isCorrect = JSON.stringify(answer) === JSON.stringify(solution);

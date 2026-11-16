@@ -61,7 +61,7 @@
       &:hover {
         border-color: var(--primary-color);
         color: var(--primary-color);
-        background-color: rgba(214, 8, 8, 0.04);
+        background-color: var(--primary-color-surface, rgba(214, 8, 8, 0.04));
       }
     }
   }
@@ -241,15 +241,11 @@
 
   &:hover {
     transform: translateY(-3px);
-    border-color: rgba(214, 8, 8, 0.3);
-    box-shadow: 0 12px 28px -6px rgba(214, 8, 8, 0.1);
+    border-color: var(--primary-color-border, rgba(214, 8, 8, 0.3));
+    box-shadow: 0 12px 28px -6px var(--primary-color-shadow, rgba(214, 8, 8, 0.1));
 
     .topic-card-thumbnail {
       transform: scale(1.05);
-    }
-
-    .topic-card-title {
-      color: var(--primary-color);
     }
 
     .action-arrow {
@@ -315,7 +311,7 @@
     .topic-card-title {
       font-size: 1.25rem;
       font-weight: 700;
-      color: var(--color-text);
+      color: var(--primary-color);
       letter-spacing: -0.01em;
       margin: 0 0 0.5rem 0;
       transition: color 0.2s ease;
@@ -334,7 +330,8 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    border-top: 1px solid rgba(0, 0, 0, 0.06);
+    background-color: var(--primary-color-surface, rgba(214, 8, 8, 0.05));
+    border-top: 1px solid var(--primary-color-border, rgba(214, 8, 8, 0.22));
 
     .topic-card-meta {
       font-size: 0.75rem;
@@ -396,7 +393,7 @@
       &:hover {
         border-color: var(--primary-color);
         color: var(--primary-color);
-        background-color: rgba(214, 8, 8, 0.04);
+        background-color: var(--primary-color-surface, rgba(214, 8, 8, 0.04));
       }
     }
 
@@ -451,7 +448,7 @@
           .chapter-tag {
             font-size: 0.75rem;
             color: var(--primary-color);
-            background-color: rgba(214, 8, 8, 0.08);
+            background-color: var(--primary-color-surface, rgba(214, 8, 8, 0.08));
             padding: 0.15rem 0.5rem;
             border-radius: 0.25rem;
           }

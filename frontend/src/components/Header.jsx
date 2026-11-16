@@ -10,6 +10,12 @@ function Header() {
    const [menuOpen, setMenuOpen] = useState(false);
    const dropdownRef = useRef(null);
 
+   // Ẩn header thông thường trên trang học bài (Focus Mode)
+   const isLessonViewPage =
+      location.pathname.includes('/lesson/') ||
+      location.pathname.startsWith('/lessons/');
+   if (isLessonViewPage) return null;
+
    const handleLogout = () => {
       setMenuOpen(false);
       logout();
