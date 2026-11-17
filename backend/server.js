@@ -450,11 +450,22 @@ app.post('/api/chapters', async (req, res, next) => {
       const tId = asObjectId(topicId);
       if (!tId || !name) return res.status(400).json({ error: 'Topic ID và tên chương là bắt buộc' });
       const count = await db.collection('chapters').countDocuments({ topicId: tId });
+      const parsedOrder = Number(order);
+      const targetOrder = Number.isInteger(parsedOrder) && parsedOrder >= 1
+         ? Math.min(parsedOrder, count + 1)
+         : count + 1;
+
+      // Tự động đẩy lùi các chương có thứ tự >= targetOrder
+      await db.collection('chapters').updateMany(
+         { topicId: tId, order: { $gte: targetOrder } },
+         { $inc: { order: 1 } }
+      );
+
       const newChapter = {
          topicId: tId,
          name,
          description: description || '',
-         order: Number(order) || count + 1,
+         order: targetOrder,
          createdAt: new Date(),
          updatedAt: new Date(),
       };
@@ -468,11 +479,37 @@ app.put('/api/chapters/:id', async (req, res, next) => {
    try {
       const id = asObjectId(req.params.id);
       if (!id) return res.status(400).json({ error: 'ID không hợp lệ' });
+      const existing = await db.collection('chapters').findOne({ _id: id });
+      if (!existing) return res.status(404).json({ error: 'Không tìm thấy chương' });
+
       const { name, description, order } = req.body || {};
       const updateData = { updatedAt: new Date() };
       if (name !== undefined) updateData.name = name;
       if (description !== undefined) updateData.description = description;
-      if (order !== undefined) updateData.order = Number(order);
+
+      if (order !== undefined && existing.topicId) {
+         const count = await db.collection('chapters').countDocuments({ topicId: existing.topicId });
+         const parsedOrder = Number(order);
+         const targetOrder = Number.isInteger(parsedOrder) && parsedOrder >= 1
+            ? Math.min(parsedOrder, count)
+            : existing.order || 1;
+         const oldOrder = existing.order || 1;
+
+         if (targetOrder < oldOrder) {
+            // Chuyển lên trên: các chương từ targetOrder đến oldOrder - 1 dịch xuống +1
+            await db.collection('chapters').updateMany(
+               { topicId: existing.topicId, _id: { $ne: id }, order: { $gte: targetOrder, $lt: oldOrder } },
+               { $inc: { order: 1 } }
+            );
+         } else if (targetOrder > oldOrder) {
+            // Chuyển xuống dưới: các chương từ oldOrder + 1 đến targetOrder dịch lên -1
+            await db.collection('chapters').updateMany(
+               { topicId: existing.topicId, _id: { $ne: id }, order: { $gt: oldOrder, $lte: targetOrder } },
+               { $inc: { order: -1 } }
+            );
+         }
+         updateData.order = targetOrder;
+      }
 
       await db.collection('chapters').updateOne({ _id: id }, { $set: updateData });
       const updated = await db.collection('chapters').findOne({ _id: id });
@@ -485,8 +522,17 @@ app.delete('/api/chapters/:id', async (req, res, next) => {
    try {
       const id = asObjectId(req.params.id);
       if (!id) return res.status(400).json({ error: 'ID không hợp lệ' });
-      await db.collection('lessons').deleteMany({ chapterId: id });
-      await db.collection('chapters').deleteOne({ _id: id });
+      const existing = await db.collection('chapters').findOne({ _id: id });
+      if (existing) {
+         await db.collection('lessons').deleteMany({ chapterId: id });
+         await db.collection('chapters').deleteOne({ _id: id });
+         if (existing.topicId && existing.order) {
+            await db.collection('chapters').updateMany(
+               { topicId: existing.topicId, order: { $gt: existing.order } },
+               { $inc: { order: -1 } }
+            );
+         }
+      }
       return res.json({ message: 'Xóa chương thành công' });
    } catch (error) { next(error); }
 });

@@ -74,7 +74,8 @@
     gap: 0.5rem;
     padding: 0.65rem 1.25rem;
     border-radius: 0.5rem;
-    background-color: var(--color-text);
+    background-color: var(--primary-color);
+    box-shadow: 0 2px 0 0 var(--primary-color-dark);
     color: #ffffff;
     font-weight: 700;
     font-size: 0.875rem;
@@ -84,7 +85,7 @@
     transition: background-color 0.2s ease, transform 0.1s ease;
 
     &:hover {
-      background-color: rgba(0, 0, 0, 0.8);
+      background-color: var(--primary-color-dark);
       transform: translateY(-1px);
     }
 
@@ -191,6 +192,16 @@
     align-items: center;
     justify-content: space-between;
     gap: 1rem;
+    transition: all 0.2s ease;
+
+    &:hover {
+      border-color: var(--primary-color-border, rgba(0, 0, 0, 0.15));
+
+      .tm-metric-icon-wrap {
+        background-color: var(--primary-color-surface, rgba(0, 0, 0, 0.04));
+        color: var(--primary-color);
+      }
+    }
 
     .tm-metric-label {
       font-size: 0.72rem;
@@ -283,13 +294,14 @@
       color: var(--color-text);
       outline: none;
       font-family: inherit;
-      transition: border-color 0.15s ease;
+      transition: border-color 0.15s ease, box-shadow 0.15s ease;
 
       &::placeholder { color: rgba(0, 0, 0, 0.35); }
 
       &:focus {
         background-color: #ffffff;
-        border-color: rgba(0, 0, 0, 0.35);
+        border-color: var(--primary-color);
+        box-shadow: 0 0 0 2px var(--primary-color-focus-ring, rgba(214, 8, 8, 0.12));
       }
     }
   }
@@ -311,10 +323,11 @@
       outline: none;
       cursor: pointer;
       font-family: inherit;
-      transition: border-color 0.15s ease;
+      transition: border-color 0.15s ease, box-shadow 0.15s ease;
 
       &:focus {
-        border-color: rgba(0, 0, 0, 0.35);
+        border-color: var(--primary-color);
+        box-shadow: 0 0 0 2px var(--primary-color-focus-ring, rgba(214, 8, 8, 0.12));
         background-color: #ffffff;
       }
     }
@@ -344,8 +357,8 @@
     transition: all 0.15s ease;
 
     &:hover {
-      background-color: rgba(214, 8, 8, 0.05);
-      border-color: rgba(214, 8, 8, 0.2);
+      background-color: var(--primary-color-surface, rgba(214, 8, 8, 0.05));
+      border-color: var(--primary-color-border, rgba(214, 8, 8, 0.2));
       color: var(--primary-color);
     }
   }
@@ -425,7 +438,13 @@
 
         &:last-child { border-bottom: none; }
 
-        &:hover { background-color: rgba(0, 0, 0, 0.015); }
+        &:hover {
+          background-color: var(--primary-color-surface, rgba(0, 0, 0, 0.015));
+
+          .topic-name {
+            color: var(--primary-color);
+          }
+        }
       }
 
       td {
@@ -493,11 +512,13 @@
     display: inline-block;
     padding: 0.2rem 0.6rem;
     border-radius: 0.25rem;
-    background-color: rgba(0, 0, 0, 0.06);
+    background-color: var(--primary-color-surface, rgba(0, 0, 0, 0.06));
+    border: 1px solid var(--primary-color-border, transparent);
     color: var(--color-text);
     font-size: 0.75rem;
     font-weight: 700;
     white-space: nowrap;
+    transition: all 0.15s ease;
   }
 
   // ── Cell: Stats ──────────────────────────────────────────────
@@ -579,8 +600,8 @@
       gap: 0.35rem;
       padding: 0.35rem 0.65rem;
       border-radius: 0.4rem;
-      background-color: rgba(0, 0, 0, 0.04);
-      border: 1px solid rgba(0, 0, 0, 0.1);
+      background-color: var(--primary-color-surface, rgba(0, 0, 0, 0.04));
+      border: 1px solid var(--primary-color-border, rgba(0, 0, 0, 0.1));
       color: var(--primary-color);
       font-size: 0.75rem;
       font-weight: 700;
@@ -590,8 +611,10 @@
       .icon { font-size: 1rem; }
 
       &:hover {
-        background-color: rgba(214, 8, 8, 0.06);
-        border-color: rgba(214, 8, 8, 0.2);
+        background-color: var(--primary-color);
+        border-color: var(--primary-color);
+        color: #ffffff;
+        box-shadow: 0 2px 6px var(--primary-color-shadow, rgba(0, 0, 0, 0.15));
       }
     }
 
@@ -611,13 +634,13 @@
       .icon { font-size: 1.1rem; }
 
       &:hover {
-        background-color: rgba(0, 0, 0, 0.06);
-        color: var(--color-text);
+        background-color: var(--primary-color-surface, rgba(0, 0, 0, 0.06));
+        color: var(--primary-color);
       }
 
       &.btn-delete:hover {
-        color: var(--primary-color);
-        background-color: rgba(214, 8, 8, 0.06);
+        color: #dc2626;
+        background-color: rgba(220, 38, 38, 0.08);
       }
     }
   }
@@ -679,8 +702,9 @@
         .icon { font-size: 1rem; }
 
         &:hover:not(:disabled) {
-          background-color: rgba(0, 0, 0, 0.04);
-          color: var(--color-text);
+          background-color: var(--primary-color-surface, rgba(0, 0, 0, 0.04));
+          border-color: var(--primary-color);
+          color: var(--primary-color);
         }
 
         &:disabled {
@@ -705,13 +729,55 @@
         cursor: pointer;
         transition: all 0.15s ease;
 
-        &:hover { background-color: rgba(0, 0, 0, 0.04); }
+        &:hover {
+          background-color: var(--primary-color-surface, rgba(0, 0, 0, 0.04));
+          border-color: var(--primary-color-border, rgba(0, 0, 0, 0.15));
+          color: var(--primary-color);
+        }
 
         &.active {
-          background-color: var(--color-text);
+          background-color: var(--primary-color);
           color: #ffffff;
-          border-color: var(--color-text);
+          border-color: var(--primary-color);
+          box-shadow: 0 2px 4px var(--primary-color-shadow, rgba(0, 0, 0, 0.15));
           font-weight: 800;
+        }
+      }
+    }
+  }
+
+  // ── Modal Styling with Dynamic Colors ────────────────────────
+  .app-modal-box {
+    .app-modal-header {
+      border-bottom: 2px solid var(--primary-color-border, rgba(0, 0, 0, 0.08));
+
+      .app-modal-title {
+        color: var(--color-text);
+      }
+
+      .app-modal-close:hover {
+        color: var(--primary-color);
+        background-color: var(--primary-color-surface, rgba(214, 8, 8, 0.05));
+      }
+    }
+
+    .app-modal-body {
+      .form-group {
+        input:focus, select:focus, textarea:focus {
+          border-color: var(--primary-color);
+          box-shadow: 0 0 0 2px var(--primary-color-focus-ring, rgba(214, 8, 8, 0.12));
+        }
+      }
+    }
+
+    .app-modal-footer {
+      .btn-save:not(.btn-save--danger) {
+        background-color: var(--primary-color);
+        box-shadow: 0 2px 0 0 var(--primary-color-dark);
+        color: #ffffff;
+
+        &:hover:not(:disabled) {
+          background-color: var(--primary-color-dark);
         }
       }
     }

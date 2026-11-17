@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import apiClient from '../configs/apiClient';
+import { getTopicThemeVars } from '../utils/theme';
 import '../styles/TopicManager.scss';
 
 // ── Discipline display names ──────────────────────────────────────────────────
@@ -24,23 +25,6 @@ function generateSlug(text) {
       .replace(/[^a-z0-9 -]/g, '')
       .replace(/\s+/g, '-')
       .replace(/-+/g, '-');
-}
-
-function formatDate(dateInput) {
-   if (!dateInput) return '--';
-   try {
-      const d = new Date(dateInput);
-      if (isNaN(d.getTime())) return '--';
-      return [
-         String(d.getDate()).padStart(2, '0'),
-         String(d.getMonth() + 1).padStart(2, '0'),
-         d.getFullYear(),
-      ].join('/') + ' ' +
-         String(d.getHours()).padStart(2, '0') + ':' +
-         String(d.getMinutes()).padStart(2, '0');
-   } catch {
-      return '--';
-   }
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -247,7 +231,7 @@ export default function TopicManager() {
 
    // ── Render ────────────────────────────────────────────────────
    return (
-      <div className="topic-manager-page">
+      <div className="topic-manager-page" style={getTopicThemeVars('#D60808')}>
 
          {/* ── Hero ───────────────────────────────────────────────── */}
          <section className="tm-hero-section">
@@ -377,8 +361,9 @@ export default function TopicManager() {
                               const rowNum    = String((safePage - 1) * pageSize + idx + 1).padStart(2, '0');
                               const discName  = DISCIPLINE_NAMES[topic.discipline] || topic.discipline || 'Vật lí';
                               const isActive  = topic.isActive !== false;
+                              const rowTheme  = getTopicThemeVars(topic.primaryColor || '#D60808');
                               return (
-                                 <tr key={topic._id || topic.slug}>
+                                 <tr key={topic._id || topic.slug} style={rowTheme}>
                                     <td className="center nowrap">
                                        <div className="tm-stt-cell">
                                           <span className="material-symbols-outlined drag-icon" title="Kéo để sắp xếp">drag_indicator</span>
@@ -395,9 +380,9 @@ export default function TopicManager() {
                                                    width: '0.75rem',
                                                    height: '0.75rem',
                                                    borderRadius: '50%',
-                                                   backgroundColor: topic.primaryColor || '#D60808',
+                                                   backgroundColor: 'var(--primary-color)',
                                                    flexShrink: 0,
-                                                   boxShadow: '0 0 0 2px rgba(0,0,0,0.08)'
+                                                   boxShadow: '0 0 0 2px var(--primary-color-border, rgba(0,0,0,0.08))'
                                                 }}
                                                 title={`Màu chủ đạo: ${topic.primaryColor || '#D60808'}`}
                                              />
@@ -496,7 +481,7 @@ export default function TopicManager() {
          {/* ── Create / Edit Modal ─────────────────────────────────── */}
          {isModalOpen && (
             <div className="app-modal-backdrop" onClick={() => setIsModalOpen(false)}>
-               <div className="app-modal-box" onClick={(e) => e.stopPropagation()}>
+               <div className="app-modal-box" style={getTopicThemeVars(formData.primaryColor || '#D60808')} onClick={(e) => e.stopPropagation()}>
                   <div className="app-modal-header">
                      <h2 className="app-modal-title">
                         {editingTopic ? 'Chỉnh sửa chuyên đề' : 'Tạo chuyên đề mới'}

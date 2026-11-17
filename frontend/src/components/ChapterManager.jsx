@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import apiClient from '../configs/apiClient';
+import { getTopicThemeVars } from '../utils/theme';
 import '../styles/ChapterManager.scss';
 
 function generateSlug(text) {
@@ -24,6 +25,10 @@ export default function ChapterManager() {
    const [chapters, setChapters] = useState([]);
    const [loading, setLoading] = useState(true);
    const [error, setError] = useState('');
+
+   const themeVars = useMemo(() => {
+      return getTopicThemeVars(topic?.primaryColor || '#D60808');
+   }, [topic?.primaryColor]);
 
    // Filter state
    const [searchQuery, setSearchQuery] = useState('');
@@ -107,7 +112,8 @@ export default function ChapterManager() {
    // Filter lessons within chapters
    const filteredChapters = useMemo(() => {
       const q = searchQuery.trim().toLowerCase();
-      return chapters.map((chap) => {
+      const sorted = [...chapters].sort((a, b) => (Number(a.order) || 0) - (Number(b.order) || 0));
+      return sorted.map((chap) => {
          const lessons = (chap.lessons || []).filter((l) => {
             if (q) {
                const match =
@@ -154,26 +160,20 @@ export default function ChapterManager() {
       setIsSubmitting(true);
       try {
          if (chapterModal.editing) {
-            const res = await apiClient.put(`/chapters/${chapterModal.editing._id}`, chapterForm);
-            setChapters((prev) =>
-               prev.map((c) =>
-                  c._id === chapterModal.editing._id
-                     ? { ...c, ...res.data, lessons: c.lessons || [] }
-                     : c
-               )
-            );
+            await apiClient.put(`/chapters/${chapterModal.editing._id}`, chapterForm);
             showToast(`Cập nhật chương: "${chapterForm.name}"`);
          } else {
             const res = await apiClient.post('/chapters', {
                ...chapterForm,
                topicId: topic._id,
             });
-            const newChap = { ...res.data, lessons: [], filteredLessons: [] };
-            setChapters((prev) => [...prev, newChap]);
-            setExpandedChapters((prev) => ({ ...prev, [newChap._id]: true }));
+            if (res.data?._id) {
+               setExpandedChapters((prev) => ({ ...prev, [res.data._id]: true }));
+            }
             showToast(`Đã thêm chương mới: "${chapterForm.name}"`);
          }
          setChapterModal({ isOpen: false, editing: null });
+         await loadTopicData();
       } catch (err) {
          showToast(err.response?.data?.error || 'Không thể lưu chương', 'error');
       } finally {
@@ -309,8 +309,8 @@ export default function ChapterManager() {
       try {
          if (type === 'chapter') {
             await apiClient.delete(`/chapters/${id}`);
-            setChapters((prev) => prev.filter((c) => c._id !== id));
             showToast('Đã xóa chương thành công');
+            await loadTopicData();
          } else if (type === 'lesson') {
             await apiClient.delete(`/lessons/${id}`);
             setChapters((prev) =>
@@ -330,7 +330,7 @@ export default function ChapterManager() {
    };
 
    return (
-      <div className="chapter-manager-page">
+      <div className="chapter-manager-page" style={themeVars}>
          <div className="cm-main-container">
             {/* Top Breadcrumb & Metadata Trail */}
             <div className="cm-breadcrumb-strip">
@@ -635,7 +635,7 @@ export default function ChapterManager() {
          {/* ── Modal Thêm / Sửa Chương ──────────────────────────── */}
          {chapterModal.isOpen && (
             <div className="app-modal-backdrop" onClick={() => setChapterModal({ isOpen: false, editing: null })}>
-               <div className="app-modal-box" onClick={(e) => e.stopPropagation()}>
+               <div className="app-modal-box" style={themeVars} onClick={(e) => e.stopPropagation()}>
                   <div className="app-modal-header">
                      <h2 className="app-modal-title">
                         {chapterModal.editing ? 'Chỉnh sửa chương' : 'Thêm chương mới'}
@@ -667,6 +667,9 @@ export default function ChapterManager() {
                               value={chapterForm.order}
                               onChange={(e) => setChapterForm({ ...chapterForm, order: e.target.value })}
                            />
+                           <span className="hint" style={{ fontSize: '0.75rem', color: 'rgba(0,0,0,0.5)', marginTop: '0.2rem' }}>
+                              * Các chương có thứ tự từ vị trí này trở đi sẽ tự động đẩy lùi xuống.
+                           </span>
                         </div>
                         <div className="form-group">
                            <label>Mô tả ngắn</label>
@@ -702,7 +705,7 @@ export default function ChapterManager() {
                className="app-modal-backdrop"
                onClick={() => setLessonModal({ isOpen: false, editing: null, chapterId: '' })}
             >
-               <div className="app-modal-box" onClick={(e) => e.stopPropagation()}>
+               <div className="app-modal-box" style={themeVars} onClick={(e) => e.stopPropagation()}>
                   <div className="app-modal-header">
                      <h2 className="app-modal-title">
                         {lessonModal.editing ? 'Chỉnh sửa bài học' : 'Thêm bài học mới'}
@@ -817,7 +820,7 @@ export default function ChapterManager() {
                className="app-modal-backdrop"
                onClick={() => setDeleteModal({ isOpen: false, type: '', id: '', name: '' })}
             >
-               <div className="app-modal-box" style={{ maxWidth: '400px' }} onClick={(e) => e.stopPropagation()}>
+               <div className="app-modal-box" style={{ ...themeVars, maxWidth: '400px' }} onClick={(e) => e.stopPropagation()}>
                   <div className="app-modal-header">
                      <h2 className="app-modal-title" style={{ color: 'var(--primary-color)' }}>Xác nhận xóa</h2>
                      <button
