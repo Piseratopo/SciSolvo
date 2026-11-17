@@ -1,17 +1,22 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, useNavigate, Link, useLocation } from 'react-router-dom';
 import apiClient from '../configs/apiClient';
 import LatexMarkdown from './common/LatexMarkdown';
 import { getTopicThemeVars } from '../utils/theme';
 import '../styles/LessonView.scss';
 
 export default function LessonView() {
-   const { lessonId } = useParams();
+   const { slug, lessonId } = useParams();
+   const location = useLocation();
    const navigate = useNavigate();
+
+   const cachedColor =
+      location.state?.topicColor ||
+      (slug ? sessionStorage.getItem(`topic_color_${slug}`) : null);
 
    const [lesson, setLesson] = useState(null);
    const [topicChapters, setTopicChapters] = useState([]);
-   const [topicColor, setTopicColor] = useState('#D60808');
+   const [topicColor, setTopicColor] = useState(cachedColor);
    const [loading, setLoading] = useState(true);
    const [error, setError] = useState('');
 
@@ -39,6 +44,12 @@ export default function LessonView() {
                setLesson(res.data);
                if (res.data.topicPrimaryColor) {
                   setTopicColor(res.data.topicPrimaryColor);
+                  if (res.data.topicSlug) {
+                     sessionStorage.setItem(
+                        `topic_color_${res.data.topicSlug}`,
+                        res.data.topicPrimaryColor
+                     );
+                  }
                }
                setActiveSectionIdx(0);
             }
@@ -73,6 +84,12 @@ export default function LessonView() {
                setTopicChapters(res.data.chapters || []);
                if (res.data.primaryColor) {
                   setTopicColor(res.data.primaryColor);
+                  if (lesson?.topicSlug) {
+                     sessionStorage.setItem(
+                        `topic_color_${lesson.topicSlug}`,
+                        res.data.primaryColor
+                     );
+                  }
                }
             }
          } catch {
@@ -258,13 +275,66 @@ export default function LessonView() {
       setIsHoldingGiveUp(false);
    };
 
+   const handleGiveUp = async () => {
+      if (!lesson || !currentSection || currentSection.type !== 'exercise')
+         return;
+
+      const token = localStorage.getItem('token');
+      if (!token) {
+         alert('Vui lòng đăng nhập để xem đáp án.');
+         return;
+      }
+
+      setSubmitting(true);
+      try {
+         const res = await apiClient.post(
+            `/lessons/${lesson._id}/exercises/${activeSectionIdx}/give-up`,
+            {},
+            { headers: { Authorization: `Bearer ${token}` } }
+         );
+
+         setExerciseResults((prev) => ({
+            ...prev,
+            [activeSectionIdx]: res.data,
+         }));
+
+         setExpandedExplanations((prev) => ({
+            ...prev,
+            [activeSectionIdx]: true,
+         }));
+      } catch (err) {
+         try {
+            const fallbackRes = await apiClient.post(
+               `/lessons/${lesson._id}/exercises/${activeSectionIdx}/submit`,
+               { giveUp: true },
+               { headers: { Authorization: `Bearer ${token}` } }
+            );
+            setExerciseResults((prev) => ({
+               ...prev,
+               [activeSectionIdx]: fallbackRes.data,
+            }));
+            setExpandedExplanations((prev) => ({
+               ...prev,
+               [activeSectionIdx]: true,
+            }));
+         } catch {
+            alert(
+               err.response?.data?.error ||
+                  'Không thể lấy đáp án bài tập lúc này.'
+            );
+         }
+      } finally {
+         setSubmitting(false);
+      }
+   };
+
    const startGiveUpHold = () => {
       if (giveUpTimerRef.current !== null) return;
       setIsHoldingGiveUp(true);
       giveUpTimerRef.current = setTimeout(() => {
          giveUpTimerRef.current = null;
          setIsHoldingGiveUp(false);
-         handleNextStep();
+         handleGiveUp();
       }, 1400);
    };
 
@@ -294,8 +364,8 @@ export default function LessonView() {
             >
                progress_activity
             </span>
-            <p style={{ marginTop: '1rem', fontWeight: 700, color: '#5e3f3a' }}>
-               Đang tải...
+            <p style={{ marginTop: '1rem', fontWeight: 700, color: 'var(--color-text, #111827)' }}>
+               Đang tải bài học...
             </p>
          </div>
       );
@@ -336,7 +406,9 @@ export default function LessonView() {
       : '/topics';
    const currentResult = exerciseResults[activeSectionIdx];
    const isCheckingAnswer =
-      currentSection?.type === 'exercise' && !currentResult?.isCorrect;
+      currentSection?.type === 'exercise' &&
+      !currentResult?.isCorrect &&
+      !currentResult?.gaveUp;
    const isLastSection = activeSectionIdx === sections.length - 1;
 
    return (
@@ -395,6 +467,7 @@ export default function LessonView() {
                                     <Link
                                        key={item._id}
                                        to={lessonUrl}
+                                       state={{ topicColor }}
                                        className={`sidebar-item ${isCurrent ? 'active' : ''}`}
                                        aria-current={
                                           isCurrent ? 'page' : undefined
@@ -448,7 +521,7 @@ export default function LessonView() {
                               }
                            />
                         </div>
-                        {currentResult?.isCorrect &&
+                        {(currentResult?.isCorrect || currentResult?.gaveUp) &&
                            currentResult.explanation && (
                               <div className="explanation-accordion">
                                  <button
@@ -489,6 +562,7 @@ export default function LessonView() {
                         {sections.map((sec, idx) => {
                            const isDone = Boolean(
                               exerciseResults[idx]?.isCorrect ||
+                              exerciseResults[idx]?.gaveUp ||
                               (sec.type === 'doc' && idx < activeSectionIdx)
                            );
                            const isActive = idx === activeSectionIdx;
@@ -545,6 +619,19 @@ export default function LessonView() {
 
                   {currentSection?.type === 'exercise' ? (
                      <div className="interactive-section">
+                        {currentResult?.gaveUp && (
+                           <div className="give-up-solution-banner">
+                              <span className="material-symbols-outlined">
+                                 lightbulb
+                              </span>
+                              <div className="banner-text">
+                                 <strong>Đáp án đã được mở</strong>
+                                 <p>
+                                    Bạn đã chọn xem đáp án cho câu hỏi này. Hãy xem đáp án đúng và lời giải chi tiết để ôn lại kiến thức nhé.
+                                 </p>
+                              </div>
+                           </div>
+                        )}
                         {currentSection.exercise?.type === 'mcq_single' && (
                            <div className="quiz-options-list">
                               {(
@@ -552,23 +639,33 @@ export default function LessonView() {
                               ).map((opt) => {
                                  const isSelected =
                                     userAnswers[activeSectionIdx] === opt.id;
+                                 const isSolution =
+                                    Boolean(currentResult?.gaveUp) &&
+                                    currentResult?.solution?.correctAnswer === opt.id;
                                  return (
                                     <label
                                        key={opt.id}
-                                       className={`option-card-label ${isSelected ? 'selected' : ''}`}
-                                       onClick={() =>
-                                          handleSelectOption(opt.id)
-                                       }
+                                       className={`option-card-label ${isSelected ? 'selected' : ''} ${isSolution ? 'is-solution' : ''}`}
+                                       onClick={() => {
+                                          if (!currentResult?.gaveUp && !currentResult?.isCorrect) {
+                                             handleSelectOption(opt.id);
+                                          }
+                                       }}
                                     >
                                        <div className="card-inner">
-                                          <span className="check-circle">
-                                             {isSelected ? '✓' : ''}
+                                          <span className={`check-circle ${isSolution ? 'solution-circle' : ''}`}>
+                                             {isSolution || isSelected ? '✓' : ''}
                                           </span>
                                           <div className="option-text">
                                              <LatexMarkdown
                                                 content={opt.label || ''}
                                              />
                                           </div>
+                                          {isSolution && (
+                                             <span className="badge-solution-tag">
+                                                Đáp án đúng
+                                             </span>
+                                          )}
                                        </div>
                                     </label>
                                  );
@@ -586,26 +683,37 @@ export default function LessonView() {
                                  const isSelected = selectedList.includes(
                                     opt.id
                                  );
+                                 const isSolution =
+                                    Boolean(currentResult?.gaveUp) &&
+                                    Array.isArray(currentResult?.solution?.correctAnswers) &&
+                                    currentResult.solution.correctAnswers.includes(opt.id);
                                  return (
                                     <label
                                        key={opt.id}
-                                       className={`option-card-label ${isSelected ? 'selected' : ''}`}
-                                       onClick={() =>
-                                          handleToggleMultipleOption(opt.id)
-                                       }
+                                       className={`option-card-label ${isSelected ? 'selected' : ''} ${isSolution ? 'is-solution' : ''}`}
+                                       onClick={() => {
+                                          if (!currentResult?.gaveUp && !currentResult?.isCorrect) {
+                                             handleToggleMultipleOption(opt.id);
+                                          }
+                                       }}
                                     >
                                        <div className="card-inner">
                                           <span
-                                             className="check-circle"
+                                             className={`check-circle ${isSolution ? 'solution-circle' : ''}`}
                                              style={{ borderRadius: '0.25rem' }}
                                           >
-                                             {isSelected ? '✓' : ''}
+                                             {isSolution || isSelected ? '✓' : ''}
                                           </span>
                                           <div className="option-text">
                                              <LatexMarkdown
                                                 content={opt.label || ''}
                                              />
                                           </div>
+                                          {isSolution && (
+                                             <span className="badge-solution-tag">
+                                                Đáp án đúng
+                                             </span>
+                                          )}
                                        </div>
                                     </label>
                                  );
@@ -677,7 +785,11 @@ export default function LessonView() {
                                                       blank.placeholder ||
                                                       'Nhập kết quả số hoặc đáp án...'
                                                    }
-                                                   value={val}
+                                                   value={
+                                                      currentResult?.gaveUp
+                                                         ? (currentResult?.solution?.blanks?.find((b) => b.id === bId)?.exactValue ?? currentResult?.solution?.exactValue ?? val)
+                                                         : val
+                                                   }
                                                    onChange={(e) =>
                                                       handleFillBlankChange(
                                                          bId,
@@ -685,7 +797,7 @@ export default function LessonView() {
                                                       )
                                                    }
                                                    disabled={Boolean(
-                                                      currentResult?.isCorrect
+                                                      currentResult?.isCorrect || currentResult?.gaveUp
                                                    )}
                                                 />
                                                 {blank.unit && (
@@ -694,6 +806,14 @@ export default function LessonView() {
                                                    </span>
                                                 )}
                                              </div>
+                                             {currentResult?.gaveUp && (
+                                                <div className="fb-solution-hint">
+                                                   <span className="badge-solution-tag">Đáp án đúng</span>
+                                                   <span className="fb-solution-val">
+                                                      {currentResult?.solution?.blanks?.find((b) => b.id === bId)?.exactValue ?? currentResult?.solution?.exactValue ?? ''}
+                                                   </span>
+                                                </div>
+                                             )}
                                           </div>
                                        );
                                     })}

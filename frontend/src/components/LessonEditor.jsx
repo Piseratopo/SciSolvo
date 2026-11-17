@@ -1,16 +1,21 @@
 import { useEffect, useState, useMemo } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import apiClient from '../configs/apiClient';
 import LatexMarkdown from './common/LatexMarkdown';
 import { getTopicThemeVars } from '../utils/theme';
 import '../styles/LessonEditor.scss';
 
 export default function LessonEditor() {
-   const { lessonId } = useParams();
+   const { slug, lessonId } = useParams();
+   const location = useLocation();
    const navigate = useNavigate();
 
+   const cachedColor =
+      location.state?.topicColor ||
+      (slug ? sessionStorage.getItem(`topic_color_${slug}`) : null);
+
    const [lesson, setLesson] = useState(null);
-   const [topicColor, setTopicColor] = useState('#D60808');
+   const [topicColor, setTopicColor] = useState(cachedColor);
    const [sections, setSections] = useState([]);
    const [activeSectionIdx, setActiveSectionIdx] = useState(0);
    const [loading, setLoading] = useState(true);
@@ -63,6 +68,12 @@ export default function LessonEditor() {
                   setLesson(lessonData);
                   if (lessonData.topicPrimaryColor) {
                      setTopicColor(lessonData.topicPrimaryColor);
+                     if (lessonData.topicSlug) {
+                        sessionStorage.setItem(
+                           `topic_color_${lessonData.topicSlug}`,
+                           lessonData.topicPrimaryColor
+                        );
+                     }
                   }
                   const secs =
                      Array.isArray(lessonData.sections) &&
@@ -79,7 +90,9 @@ export default function LessonEditor() {
                           ];
                   setSections(secs);
                   // Khởi tạo snapshot ban đầu từ section đầu tiên
-                  setPreviewSection(secs[0] ? JSON.parse(JSON.stringify(secs[0])) : null);
+                  setPreviewSection(
+                     secs[0] ? JSON.parse(JSON.stringify(secs[0])) : null
+                  );
                }
             }
          } catch (err) {
@@ -630,13 +643,13 @@ export default function LessonEditor() {
                                  }
                               >
                                  <option value="mcq_single">
-                                    Trắc nghiệm 1 đáp án (mcq_single)
+                                    Trắc nghiệm 1 đáp án
                                  </option>
                                  <option value="mcq_multiple">
-                                    Trắc nghiệm nhiều đáp án (mcq_multiple)
+                                    Trắc nghiệm nhiều đáp án
                                  </option>
                                  <option value="fill_blank">
-                                    Điền số / kết quả (fill_blank)
+                                    Điền số / kết quả
                                  </option>
                               </select>
                            </div>
@@ -1117,7 +1130,7 @@ export default function LessonEditor() {
                                                    <input
                                                       type="text"
                                                       disabled
-                                                      placeholder="Ô nhập đáp án của học sinh..."
+                                                      placeholder="Ô nhập đáp án..."
                                                    />
                                                    <span className="fb-hint">
                                                       (Đáp số:{' '}

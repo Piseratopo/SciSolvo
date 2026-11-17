@@ -29,6 +29,9 @@ export default function TopicView() {
       try {
          const response = await apiClient.get(`/topics/${topicSlug}`);
          setTopic(response.data);
+         if (response.data.primaryColor) {
+            sessionStorage.setItem(`topic_color_${topicSlug}`, response.data.primaryColor);
+         }
          // Tự động mở chương đầu tiên nếu có
          if (response.data.chapters?.length > 0) {
             setExpandedChapters({ [response.data.chapters[0]._id]: true });
@@ -129,7 +132,7 @@ export default function TopicView() {
                                           <div
                                              key={lesson._id}
                                              className="lesson-item"
-                                             onClick={() => navigate(`/topics/${slug}/lesson/${lesson._id}`)}
+                                             onClick={() => navigate(`/topics/${slug}/lesson/${lesson._id}`, { state: { topicColor: topic?.primaryColor } })}
                                           >
                                              <div className="lesson-info">
                                                 <h4 className="lesson-title">{lesson.title}</h4>

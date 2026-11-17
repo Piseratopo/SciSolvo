@@ -582,7 +582,7 @@
 
       &:hover {
         color: var(--primary-color);
-        background-color: rgba(214, 8, 8, 0.05);
+        background-color: var(--primary-color-surface, rgba(214, 8, 8, 0.05));
       }
     }
   }
@@ -657,7 +657,7 @@
 
           &:hover {
             border-color: var(--primary-color);
-            background-color: rgba(214, 8, 8, 0.02);
+            background-color: var(--primary-color-surface, rgba(214, 8, 8, 0.02));
           }
 
           input[type="radio"] {

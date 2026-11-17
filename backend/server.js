@@ -740,7 +740,7 @@ app.get('/api/lessons/:lessonId', async (req, res, next) => {
 app.post('/api/lessons/:lessonId/exercises/:sectionIndex/submit', requireToken, async (req, res, next) => {
    const lessonId = asObjectId(req.params.lessonId);
    const sectionIndex = Number(req.params.sectionIndex);
-   const { answer } = req.body || {};
+   const { answer, giveUp } = req.body || {};
 
    if (!lessonId || !Number.isInteger(sectionIndex)) {
       return res.status(400).json({ error: 'Invalid parameters' });
@@ -758,6 +758,16 @@ app.post('/api/lessons/:lessonId/exercises/:sectionIndex/submit', requireToken, 
       }
 
       const { type, solution, explanation } = sec.exercise;
+
+      if (giveUp) {
+         return res.json({
+            isCorrect: false,
+            gaveUp: true,
+            solution: solution || null,
+            explanation: explanation || '',
+         });
+      }
+
       let isCorrect = false;
 
       // Polymorphic grading based on exercise type
@@ -802,6 +812,37 @@ app.post('/api/lessons/:lessonId/exercises/:sectionIndex/submit', requireToken, 
       return res.json({
          isCorrect,
          ...(isCorrect && { explanation: explanation || '' }),
+      });
+   } catch (error) { next(error); }
+});
+
+// 5. Give up on an exercise section to reveal solution and explanation
+app.post('/api/lessons/:lessonId/exercises/:sectionIndex/give-up', requireToken, async (req, res, next) => {
+   const lessonId = asObjectId(req.params.lessonId);
+   const sectionIndex = Number(req.params.sectionIndex);
+
+   if (!lessonId || !Number.isInteger(sectionIndex)) {
+      return res.status(400).json({ error: 'Invalid parameters' });
+   }
+
+   try {
+      const lesson = await db.collection('lessons').findOne({ _id: lessonId });
+      if (!lesson || !lesson.sections || !lesson.sections[sectionIndex]) {
+         return res.status(404).json({ error: 'Exercise section not found' });
+      }
+
+      const sec = lesson.sections[sectionIndex];
+      if (sec.type !== 'exercise' || !sec.exercise) {
+         return res.status(400).json({ error: 'Section is not an exercise' });
+      }
+
+      const { solution, explanation } = sec.exercise;
+
+      return res.json({
+         isCorrect: false,
+         gaveUp: true,
+         solution: solution || null,
+         explanation: explanation || '',
       });
    } catch (error) { next(error); }
 });
